@@ -1,6 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './core/filters/global-exception.filter';
+import { TransformInterceptor } from './core/interceptors/transform.interceptor';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -10,6 +13,10 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix('api/v1');
   app.enableCors({ origin: corsOrigin, credentials: true });
+  app.use(helmet());
+
+  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalInterceptors(new TransformInterceptor());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Fables Flow API')

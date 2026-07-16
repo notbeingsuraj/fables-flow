@@ -1,6 +1,4 @@
 // Prisma schema — Fables Flow
-// Models will be added in Milestone 1.2+
-// This file establishes the datasource and generator configuration.
 
 generator client {
   provider = "prisma-client-js"
@@ -10,3 +8,173 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// -----------------------------------------------------------------------------
+// Identity & Tenant Foundation
+// -----------------------------------------------------------------------------
+
+enum PlanTier {
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model Organization {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String               @db.VarChar(255)
+  slug             String               @unique @db.VarChar(255)
+  planTier         PlanTier             @default(STARTER) @map("plan_tier")
+  status           OrgStatus            @default(ACTIVE)
+  stripeCustomerId String?              @map("stripe_customer_id") @db.VarChar(255)
+  
+  settings         OrganizationSetting?
+  users            User[]
+  roles            Role[]
+  auditLogs        AuditLog[]
+  featureFlags     FeatureFlag[]
+
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  deletedAt        DateTime?            @map("deleted_at")
+
+  @@map("organizations")
+}
+
+model OrganizationSetting {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @unique @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // JSONB for flexible settings (e.g. { "currency": "INR", "timezone": "Asia/Kolkata", "gst": "..." })
+  settings       Json         @default("{}")
+
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("organization_settings")
+}
+
+model User {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  roleId          String       @map("role_id") @db.Uuid
+  role            Role         @relation(fields: [roleId], references: [id])
+
+  email           String       @db.VarChar(255)
+  passwordHash    String       @map("password_hash") @db.VarChar(255)
+  firstName       String       @map("first_name") @db.VarChar(100)
+  lastName        String       @map("last_name") @db.VarChar(100)
+  
+  isEmailVerified Boolean      @default(false) @map("is_email_verified")
+  loginAttempts   Int          @default(0) @map("login_attempts")
+  lockedAt        DateTime?    @map("locked_at")
+  
+  sessions        Session[]
+  auditLogs       AuditLog[]
+
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  deletedAt       DateTime?    @map("deleted_at")
+
+  @@unique([organizationId, email]) // Same email can potentially exist in different orgs
+  @@map("users")
+}
+
+model Role {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  name           String           @db.VarChar(100)
+  description    String?          @db.Text
+  isSystem       Boolean          @default(false) @map("is_system") // If true, cannot be deleted (e.g. Owner, Admin)
+  
+  permissions    RolePermission[]
+  users          User[]
+
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@unique([organizationId, name])
+  @@map("roles")
+}
+
+model RolePermission {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId        String   @map("role_id") @db.Uuid
+  role          Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  permissionKey String   @map("permission_key") @db.VarChar(100) // e.g. "users.create"
+
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([roleId, permissionKey])
+  @@map("role_permissions")
+}
+
+model Session {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  refreshTokenHash String   @map("refresh_token_hash") @db.Text
+  ipAddress        String?  @map("ip_address") @db.VarChar(45)
+  userAgent        String?  @map("user_agent") @db.Text
+  isRevoked        Boolean  @default(false) @map("is_revoked")
+  expiresAt        DateTime @map("expires_at")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model AuditLog {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  actorId        String?      @map("actor_id") @db.Uuid
+  actor          User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  
+  entityName     String       @map("entity_name") @db.VarChar(100) // e.g., 'User', 'Role'
+  entityId       String       @map("entity_id") @db.VarChar(100)
+  action         String       @db.VarChar(50) // e.g., 'CREATE', 'UPDATE', 'DELETE'
+  
+  oldValues      Json?        @map("old_values")
+  newValues      Json?        @map("new_values")
+  changedFields  Json?        @map("changed_fields") // Array of strings
+  
+  reason         String?      @db.Text
+  ipAddress      String?      @map("ip_address") @db.VarChar(45)
+  
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([organizationId, entityName, entityId])
+  @@index([organizationId, createdAt])
+  @@map("audit_logs")
+}
+
+model FeatureFlag {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String?       @map("organization_id") @db.Uuid // Nullable for global flags
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  key            String        @db.VarChar(100)
+  value          Json          // can be true/false or complex config
+  
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@unique([organizationId, key]) // OrganizationId can be null, meaning a global setting. (Note: in PG, null != null, but it's acceptable for global uniqueness if managed properly)
+  @@map("feature_flags")
+}
+

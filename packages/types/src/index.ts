@@ -52,3 +52,14 @@ export interface ApiSuccessResponse<T> {
  * Union type for all API responses.
  */
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+/**
+ * JWT Payload structure for access tokens.
+ */
+export interface JwtPayload {
+  sub: string; // User ID
+  email: string;
+  orgId: string; // Organization ID
+  roleId: string; // Role ID
+  type: 'access' | 'refresh';
+}
