@@ -1,85 +1,29 @@
 'use client';
 
 import { AppShell } from '@/components/layout/app-shell';
-import { SidebarGroup, SidebarItem } from '@/components/layout/sidebar';
+import { PageTemplate } from '@/components/layout/page-template';
 import { StatsCard } from '@/components/data/stats-card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { StatCardSkeleton } from '@/components/feedback/skeletons';
-import {
-  LayoutDashboard,
-  ShoppingCart,
-  Package,
-  Users,
-  BarChart3,
-  Settings,
-  Workflow,
-  Wallet,
-  TrendingUp,
-} from 'lucide-react';
-
-function SidebarContent() {
-  return (
-    <>
-      <SidebarGroup label="Main">
-        <SidebarItem href="/" icon={<LayoutDashboard />} active>
-          Dashboard
-        </SidebarItem>
-        <SidebarItem
-          href="/orders"
-          icon={<ShoppingCart />}
-          badge={
-            <Badge variant="info" size="sm">
-              12
-            </Badge>
-          }
-        >
-          Orders
-        </SidebarItem>
-        <SidebarItem href="/inventory" icon={<Package />}>
-          Inventory
-        </SidebarItem>
-        <SidebarItem href="/contacts" icon={<Users />}>
-          Contacts
-        </SidebarItem>
-        <SidebarItem href="/workflows" icon={<Workflow />}>
-          Workflows
-        </SidebarItem>
-      </SidebarGroup>
-      <SidebarGroup label="Finance">
-        <SidebarItem href="/payments" icon={<Wallet />}>
-          Payments
-        </SidebarItem>
-        <SidebarItem href="/reports" icon={<BarChart3 />}>
-          Reports
-        </SidebarItem>
-      </SidebarGroup>
-      <SidebarGroup>
-        <SidebarItem href="/settings" icon={<Settings />}>
-          Settings
-        </SidebarItem>
-      </SidebarGroup>
-    </>
-  );
-}
+import { ShoppingCart, Package, Users, BarChart3, TrendingUp, Plus } from 'lucide-react';
+import Link from 'next/link';
 
 export default function HomePage() {
   return (
-    <AppShell
-      sidebar={<SidebarContent />}
-      user={{ name: 'Suraj Kumar', email: 'suraj@fablesflow.com' }}
-    >
-      <div className="space-y-6 p-6">
-        {/* Page Header */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground text-sm font-medium">
-            Welcome back. Here's what's happening today.
-          </p>
-        </div>
-
+    <AppShell user={{ name: 'Suraj Kumar', email: 'suraj@fablesflow.com' }}>
+      <PageTemplate
+        title="Dashboard"
+        subtitle="Welcome back. Here's what's happening today."
+        actions={
+          <Button size="sm" className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" />
+            New Order
+          </Button>
+        }
+      >
         {/* Stats Grid */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatsCard
@@ -142,7 +86,7 @@ export default function HomePage() {
                             ? 'info'
                             : order.status === 'Processing'
                               ? 'warning'
-                              : 'default'
+                              : 'secondary'
                       }
                       size="sm"
                     >
@@ -161,22 +105,19 @@ export default function HomePage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-2">
-                <Button variant="outline" className="h-10 justify-start">
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  Create New Order
-                </Button>
-                <Button variant="outline" className="h-10 justify-start">
-                  <Package className="mr-2 h-4 w-4" />
-                  Update Inventory
-                </Button>
-                <Button variant="outline" className="h-10 justify-start">
-                  <Users className="mr-2 h-4 w-4" />
-                  Add New Contact
-                </Button>
-                <Button variant="outline" className="h-10 justify-start">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  View Reports
-                </Button>
+                {[
+                  { label: 'Create New Order', href: '/orders', icon: ShoppingCart },
+                  { label: 'Update Inventory', href: '/inventory', icon: Package },
+                  { label: 'Add New Contact', href: '/retailers', icon: Users },
+                  { label: 'View Reports', href: '/reports', icon: BarChart3 },
+                ].map((action) => (
+                  <Link key={action.href} href={action.href}>
+                    <Button variant="outline" className="h-10 w-full justify-start">
+                      <action.icon className="mr-2 h-4 w-4" />
+                      {action.label}
+                    </Button>
+                  </Link>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -192,7 +133,7 @@ export default function HomePage() {
             <StatCardSkeleton />
           </div>
         </div>
-      </div>
+      </PageTemplate>
     </AppShell>
   );
 }
